@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "populate-db", "populate-db\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "populate-db-2", "populate-db-2\populate-db-2.csproj", "{60E8CC76-4B63-41EB-8DCE-5E787E5D469E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MeiliSearch-DataTransfer", "MeiliSearch-DataTransfer\MeiliSearch-DataTransfer.csproj", "{65393A64-832F-4D26-BA7C-E4FA28870C8F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{60E8CC76-4B63-41EB-8DCE-5E787E5D469E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{60E8CC76-4B63-41EB-8DCE-5E787E5D469E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{60E8CC76-4B63-41EB-8DCE-5E787E5D469E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{65393A64-832F-4D26-BA7C-E4FA28870C8F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{65393A64-832F-4D26-BA7C-E4FA28870C8F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{65393A64-832F-4D26-BA7C-E4FA28870C8F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{65393A64-832F-4D26-BA7C-E4FA28870C8F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
