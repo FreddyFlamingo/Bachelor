@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MeiliSearch_DataTransfer.DocModels
+namespace TransferToMeiliSearch.DocModels
 {
     public class ComponentPartDoc
     {
