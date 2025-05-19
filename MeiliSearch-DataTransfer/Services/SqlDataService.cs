@@ -21,7 +21,7 @@ namespace TransferToMeiliSearch.Services
             string sql = $@"
                 SELECT
                     -- Sparepart
-                    sp.Id, sp.SparePartNo AS SparePartPartNo, sp.SparePartSerialCode AS SparePartSerialCode,
+                    sp.Id as SparePartId, sp.SparePartNo AS SparePartPartNo, sp.SparePartSerialCode AS SparePartSerialCode,
                     sp.Name AS SparePartName, sp.Description AS SparePartDescription,
                     sp.TypeNo AS SparePartTypeNo, sp.Notes AS SparePartNotes,
                     sp.UnitGuid, sp.CategoryGuid, sp.SupplierGuid, sp.LocationGuid, sp.ManufacturerGuid,    -- Guids bruges til joins

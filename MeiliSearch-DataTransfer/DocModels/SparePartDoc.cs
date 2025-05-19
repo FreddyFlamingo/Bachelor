@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace TransferToMeiliSearch.DocModels
@@ -9,6 +10,7 @@ namespace TransferToMeiliSearch.DocModels
     public class SparePartDoc
     {
         // SparePart table
+        [JsonPropertyName("SparePartId")]
         public required string SparePartId { get; set; }               // MeiliSearch Primary Key som string
         public required string SparePartPartNo { get; set; }
         public required string SparePartSerialCode { get; set; }
