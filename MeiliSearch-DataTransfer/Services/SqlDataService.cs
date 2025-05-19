@@ -1,6 +1,7 @@
 ﻿using Dapper;
 using Microsoft.Data.SqlClient;
 using System.Data;
+using System.Runtime.CompilerServices;
 using TransferToMeiliSearch.DtoModels;
 using TransferToMeiliSearch.Services.Interfaces;
 
@@ -15,7 +16,7 @@ namespace TransferToMeiliSearch.Services
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         }
 
-        public async Task<IEnumerable<SparePartDto>> GetSparePartsBatchAsync(int offset, int limit, CancellationToken cancellationToken = default)
+        public async IAsyncEnumerable<SparePartDto> StreamSparePartsBatchAsync(int offset, int limit, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             // Evt. overvej at flytte den til en .sql fil og læse den ind, hvis den bliver meget lang.
             string sql = $@"
@@ -48,22 +49,36 @@ namespace TransferToMeiliSearch.Services
                 FETCH NEXT @Limit ROWS ONLY;
             ";
                 
-            try
+            //try
+            //{
+            using (var db = new SqlConnection(_settings.SqlConnectionString))
             {
-                using (IDbConnection db = new SqlConnection(_settings.SqlConnectionString))
+                await db.OpenAsync(cancellationToken).ConfigureAwait(false);
+                    
+                //var command = new CommandDefinition(
+                //    sql, 
+                //    new { Offset = offset, Limit = limit }, 
+                //    cancellationToken: cancellationToken
+                //);
+                await foreach (var item in db.QueryUnbufferedAsync<SparePartDto>(
+                                            sql: sql,
+                                            param: new { Offset = offset, Limit = limit },
+                                            transaction: null, // Medmindre du bruger en eksplicit transaktion
+                                            commandTimeout: null, // Standard Dapper timeout (typisk 30 sekunder)
+                                            commandType: CommandType.Text
+                                        ).WithCancellation(cancellationToken)
+                                        .ConfigureAwait(false))
                 {
-                    // Sørg for at din token bliver brugt, hvis Dapper versionen understøtter det direkte.
-                    // Ellers, vær opmærksom på, hvordan cancellation håndteres for lange queries.
-                    var command = new CommandDefinition(sql, new { Offset = offset, Limit = limit }, cancellationToken: cancellationToken);
-                    return await db.QueryAsync<SparePartDto>(command);
+                    yield return item;
                 }
             }
-            catch (SqlException ex)
-            {
-                Console.WriteLine($"[{DateTime.Now}] SQL ERROR fetching data: {ex.Message}");
-                // Overvej mere specifik fejlhåndtering eller re-throw
-                throw;
-            }
+            //}
+            //catch (SqlException ex)
+            //{
+            //    Console.WriteLine($"[{DateTime.Now}] SQL ERROR fetching data: {ex.Message}");
+            //    // Overvej mere specifik fejlhåndtering eller re-throw
+            //    throw;
+            //}
         }
     }
 }

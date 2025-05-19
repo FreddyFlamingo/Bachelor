@@ -1,4 +1,9 @@
-﻿using TransferToMeiliSearch.DtoModels;
+﻿// TransferToMeiliSearch/Services/DataTransferOrchestrator.cs
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using TransferToMeiliSearch.DocModels;
 using TransferToMeiliSearch.Mappers;
 using TransferToMeiliSearch.Services.Interfaces;
@@ -23,10 +28,10 @@ namespace TransferToMeiliSearch.Services
 
         public async Task OrchestrateTransferAsync(CancellationToken cancellationToken = default)
         {
-            Console.WriteLine($"[{DateTime.Now}] Starting data transfer orchestration...");
-            long totalDocumentsProcessed = 0;
-            int currentOffset = 0;
-            bool moreDataExists = true;
+            Console.WriteLine($"[{DateTime.Now}] Starting data transfer orchestration (using QueryUnbufferedAsync)...");
+            long totalDocumentsSuccessfullySentToMeili = 0;
+            int currentSqlOffset = 0;
+            bool moreSqlDataExists = true;
 
             try
             {
@@ -36,44 +41,80 @@ namespace TransferToMeiliSearch.Services
                     _settings.MeiliSearchIndexPrimaryKey,
                     cancellationToken);
 
-                while (moreDataExists && !cancellationToken.IsCancellationRequested)
+                while (moreSqlDataExists && !cancellationToken.IsCancellationRequested)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    Console.WriteLine($"[{DateTime.Now}] Fetching SQL data batch. Offset: {currentOffset}, BatchSize: {_settings.BatchSize}...");
-                    var sparePartDtos = (await _sqlService.GetSparePartsBatchAsync(currentOffset, _settings.BatchSize, cancellationToken)).ToList();
+                    Console.WriteLine($"[{DateTime.Now}] Streaming SQL data. Offset: {currentSqlOffset}, SQL BatchSize (Limit): {_settings.BatchSize}...");
 
-                    if (!sparePartDtos.Any())
+                    var sparePartDocsForCurrentMeiliBatch = new List<SparePartDoc>(_settings.BatchSize);
+                    int documentsInThisSqlStream = 0;
+
+                    // Brug await foreach til at konsumere IAsyncEnumerable
+                    await foreach (var sparePartDto in _sqlService.StreamSparePartsBatchAsync(currentSqlOffset, _settings.BatchSize, cancellationToken)
+                                                                 .WithCancellation(cancellationToken) // Sikrer cancellation under iteration
+                                                                 .ConfigureAwait(false)) // Anbefales for library-kode
                     {
-                        moreDataExists = false;
-                        Console.WriteLine($"[{DateTime.Now}] No more data found in SQL to transfer.");
-                        return;
+                        documentsInThisSqlStream++;
+                        var sparePartDoc = SparePartMapper.ToDoc(sparePartDto);
+                        if (sparePartDoc != null)
+                        {
+                            sparePartDocsForCurrentMeiliBatch.Add(sparePartDoc);
+                        }
+                        // Ingen grund til at tjekke batchstørrelse her
+                        // IAsyncEnumerable signalerer slut, når SQL-siden er færdig med den aktuelle page.
                     }
 
-                    Console.WriteLine($"[{DateTime.Now}] Fetched {sparePartDtos.Count()} spareparts from SQL.");
-
-                    var sparePartDocs = SparePartMapper.ToDocs(sparePartDtos).ToList();
-
-                    if (sparePartDocs.Any())
+                    if (cancellationToken.IsCancellationRequested)
                     {
-                        await _meiliService.ProcessBatchAsync(index, sparePartDocs, cancellationToken);
-                        totalDocumentsProcessed += sparePartDocs.Count;
-                        Console.WriteLine($"[{DateTime.Now}] Processed batch. Total documents processed so far: { totalDocumentsProcessed}.");
+                        Console.WriteLine($"[{DateTime.Now}] Data transfer was cancelled during SQL data streaming for offset {currentSqlOffset}.");
+                        break;
                     }
-                    currentOffset += _settings.BatchSize;
+
+                    if (documentsInThisSqlStream > 0)
+                    {
+                        Console.WriteLine($"[{DateTime.Now}] Streamed {documentsInThisSqlStream} spareparts from SQL for offset {currentSqlOffset}.");
+                        Console.WriteLine($"[{DateTime.Now}] Sending batch of {sparePartDocsForCurrentMeiliBatch.Count} documents to MeiliSearch...");
+
+                        await _meiliService.ProcessBatchAsync(index, sparePartDocsForCurrentMeiliBatch, cancellationToken);
+
+                        totalDocumentsSuccessfullySentToMeili += sparePartDocsForCurrentMeiliBatch.Count;
+                        Console.WriteLine($"[{DateTime.Now}] Batch processed by MeiliSearch. Total documents successfully sent so far: {totalDocumentsSuccessfullySentToMeili}.");
+                    }
+
+                    // Bestem om der er mere data
+                    if (documentsInThisSqlStream < _settings.BatchSize)
+                    {
+                        moreSqlDataExists = false;
+                        Console.WriteLine($"[{DateTime.Now}] Streamed {documentsInThisSqlStream} documents from SQL (SQL BatchSize was {_settings.BatchSize}). Assuming no more data.");
+                    }
+                    else if (documentsInThisSqlStream == 0 && currentSqlOffset == 0)
+                    {
+                        moreSqlDataExists = false;
+                        Console.WriteLine($"[{DateTime.Now}] No data found in SQL database from the beginning.");
+                    }
+                    else if (documentsInThisSqlStream == 0)
+                    {
+                        moreSqlDataExists = false;
+                        Console.WriteLine($"[{DateTime.Now}] No more data found in SQL from offset {currentSqlOffset}.");
+                    }
+                    else
+                    {
+                        currentSqlOffset += _settings.BatchSize;
+                    }
                 }
-                
+
                 if (cancellationToken.IsCancellationRequested)
                 {
-                    Console.WriteLine($"[{DateTime.Now}] Data transfer was cancelled during batch processing.");
+                    Console.WriteLine($"[{DateTime.Now}] Data transfer was cancelled by user request partway through.");
                 }
                 else
                 {
-                    Console.WriteLine($"[{DateTime.Now}] Data transfer orchestration completed succesfully. Total documents processed: {totalDocumentsProcessed}.");
+                    Console.WriteLine($"[{DateTime.Now}] Data transfer orchestration completed. Total documents sent to MeiliSearch: {totalDocumentsSuccessfullySentToMeili}.");
                 }
             }
             catch (OperationCanceledException)
             {
-                Console.WriteLine($"[{DateTime.Now}] Data transfer was canceled.");
+                Console.WriteLine($"[{DateTime.Now}] Data transfer operation was canceled.");
             }
             catch (Exception ex)
             {
