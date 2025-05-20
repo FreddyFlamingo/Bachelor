@@ -30,7 +30,7 @@ namespace TransferToMeiliSearch.Services
         {
             Console.WriteLine($"[{DateTime.Now}] Starting data transfer orchestration (using QueryUnbufferedAsync)...");
             long totalDocumentsSuccessfullySentToMeili = 0;
-            int currentSqlOffset = 0;
+            int currentSqlOffset = 435_000; // NORMALT '0', men endte her da jeg gik over til Dappers Query Async Unbuffered...
             bool moreSqlDataExists = true;
 
             try
