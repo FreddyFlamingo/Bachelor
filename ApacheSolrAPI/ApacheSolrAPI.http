@@ -1,6 +1,0 @@
-@ApacheSolrAPI_HostAddress = http://localhost:5002
-
-GET {{ApacheSolrAPI_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
